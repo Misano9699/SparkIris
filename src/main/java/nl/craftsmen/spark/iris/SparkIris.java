@@ -12,7 +12,7 @@ import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.when;
 
 /**
- * Apache Spark MLLib Java algorithm for classifying the Iris Species (see https://www.kaggle.com/uciml/iris)
+ * Apache Spark MLLib Java algorithm for classifying the Iris Species
  * into three categories using a Random Forest Classification algorithm.
  */
 public class SparkIris {
@@ -24,30 +24,27 @@ public class SparkIris {
         // initialise Spark session
         SparkSession sparkSession = SparkSession.builder().appName("SparkIris").getOrCreate();
 
-        // load dataset
+        // load dataset, which has a header at the first row
         Dataset<Row> rawData = sparkSession.read().option("header", "true").csv(PATH);
 
-        // cast the values of the features to doubles
+        // cast the values of the features to doubles for usage in the feature column vector
         Dataset<Row> transformedDataSet = rawData.withColumn("SepalLengthCm", rawData.col("SepalLengthCm").cast("double"))
                 .withColumn("SepalWidthCm", rawData.col("SepalWidthCm").cast("double"))
                 .withColumn("PetalLengthCm", rawData.col("PetalLengthCm").cast("double"))
                 .withColumn("PetalWidthCm", rawData.col("PetalWidthCm").cast("double"));
 
-        // add a numerical label column for Classifier
+        // add a numerical label column for the Random Forest Classifier
         transformedDataSet = transformedDataSet
                 .withColumn("label", when(col("Species").equalTo("Iris-setosa"),1)
                 .when(col("Species").equalTo("Iris-versicolor"),2)
                 .otherwise(3));
-
-        // show first 20 elements
-        transformedDataSet.show();
 
         // identify the feature colunms
         String[] inputColumns = {"SepalLengthCm", "SepalWidthCm", "PetalLengthCm", "PetalWidthCm"};
         VectorAssembler assembler = new VectorAssembler().setInputCols(inputColumns).setOutputCol("features");
         Dataset<Row> featureSet = assembler.transform(transformedDataSet);
 
-        // split data random in training (70%) and test (30%) set using a seed
+        // split data random in trainingset (70%) and testset (30%) using a seed so results can be reproduced
         long seed = 5043;
         Dataset<Row>[] trainingAndTestSet = featureSet.randomSplit(new double[]{0.7, 0.3}, seed);
         Dataset<Row> trainingSet = trainingAndTestSet[0];
@@ -55,12 +52,8 @@ public class SparkIris {
 
         trainingSet.show();
 
-        // train the algorithm based on a Random Forest Classification Algorithm
+        // train the algorithm based on a Random Forest Classification Algorithm with default values
         RandomForestClassifier randomForestClassifier = new RandomForestClassifier().setSeed(seed);
-//                .setImpurity("gini")
-//                .setMaxDepth(3)
-//                .setFeatureSubsetStrategy("auto")
-//                .setNumTrees(20);
         RandomForestClassificationModel model = randomForestClassifier.fit(trainingSet);
 
         // test the model against the testset and show results
@@ -73,6 +66,6 @@ public class SparkIris {
                 .setPredictionCol("prediction")
                 .setMetricName("accuracy");
 
-        System.out.println("accuracy:" + evaluator.evaluate(predictions));
+        System.out.println("accuracy: " + evaluator.evaluate(predictions));
     }
 }
